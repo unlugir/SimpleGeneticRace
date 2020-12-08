@@ -5,10 +5,11 @@ using System.Linq;
 public class CarsController : MonoBehaviour
 {
     [SerializeField] GameObject carPrefab;
-        [SerializeField] public int carsAmount;
-    [SerializeField] List<GameObject> roads;
+    [SerializeField] public int carsAmount;
+    [SerializeField] List<Road> roads;
     private int currentRoadIndex = 0;
     public int iteration = 0;
+    private bool raceModeEnabled;
     public bool useBestOfOne = true;
     List<Car> generatedCars;
     System.Random mutationRandomizer;
@@ -25,13 +26,16 @@ public class CarsController : MonoBehaviour
     public void SwitchRoad()
     {
         ResetCars();
-        roads[currentRoadIndex].SetActive(false);
+        roads[currentRoadIndex].gameObject.SetActive(false);
         currentRoadIndex++;
         if (currentRoadIndex >= roads.Count) currentRoadIndex = 0;
-        roads[currentRoadIndex].SetActive(true);
+        roads[currentRoadIndex].gameObject.SetActive(true);
     }
-    private void BestOfOne(){
-        Car bestCar = generatedCars.First();
+    private void BestOfOne(Car fatherCar = null){
+        Car bestCar;
+        if (fatherCar ==null) bestCar = generatedCars.First();
+        else bestCar = fatherCar;
+
         foreach(var car in generatedCars){
             if (car == bestCar) continue;
             car.carBrain.ReplaceBrains(bestCar.carBrain.brain);
@@ -50,24 +54,60 @@ public class CarsController : MonoBehaviour
             car.carBrain.ReplaceBrains(combinedBrains);
             car.carBrain.MutateBrains(new System.Random(mutationRandomizer.Next()));            
         }
-
+    }
+    public void EnableRaceMode(){
+        raceModeEnabled = true;
+        roads[currentRoadIndex].EnableFinishLine();
+    }
+    public void DisableRaceMode(){
+        raceModeEnabled = false;
+        roads[currentRoadIndex].DisableFinishLine();
+    }
+    public bool SwitchRaceMode(){
+        if (raceModeEnabled){
+            DisableRaceMode();
+            return false;
+        }
+        else{
+            EnableRaceMode();
+            return true;
+        }
+    }
+    public void RaceBest(Car triggerCar){
+        if (!raceModeEnabled) return;
+        if (triggerCar.GetFitness() == 0) return;
+        iteration++;
+        GameManager.Instance.canvasController
+            .SetBestTime(triggerCar.GetFitness(), false);
+        GameManager.Instance.canvasController
+            .SetBestColor(triggerCar.GetComponent<Renderer>().material.color);
+        BestOfOne(triggerCar);
+        ResetCars();
     }
     public void SortCars(){
         generatedCars.Sort();
         generatedCars.Reverse();
     }
     private void Update() {
-        if(!generatedCars.Any(car=>car.carMover.alive)){
+        int aliveCarsAmout = generatedCars.Where(car=>car.carMover.alive).ToList().Count;
+        GameManager.Instance.canvasController.SetAlive(aliveCarsAmout);
+        GameManager.Instance.canvasController.SetIteration(iteration);
+        if(aliveCarsAmout==0){
             iteration++;
             SortCars();
+            GameManager.Instance.canvasController
+                .SetBestColor(generatedCars.First().GetComponent<Renderer>().material.color);
+            GameManager.Instance.canvasController
+                .SetBestTime(generatedCars.First().GetFitness(),true);
             if (useBestOfOne)
                 BestOfOne();
             else
                 BestOfTwo();
             ResetCars();
+
         }
     }
-     private void ResetCars(){
+    public void ResetCars(){
         foreach(var car in generatedCars){
             car.transform.position = transform.position;
             car.transform.rotation = carPrefab.transform.rotation;

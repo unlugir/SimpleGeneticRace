@@ -312,6 +312,7 @@ MonoBehaviour:
   rayLayer:
     serializedVersion: 2
     m_Bits: 512
+  brainValue: 0
   lockMutations: 0
   sensorDistances: []
 --- !u!50 &8233558534988255141
